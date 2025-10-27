@@ -54,13 +54,6 @@ def get_equity(symbol):
         df.rename(columns={close_col:"Close"}, inplace=True)
     return df[["Date","Close"]].dropna()
 
-@st.cache_data(show_spinner=False)
-def cbonds_demo_emission(isin):
-    url="https://ws.cbonds.info/services/json/demo/"
-    params={"method":"get_emissions","ISIN":isin,"username":"Test","password":"Test"}
-    try:
-        r=requests.get(url,params=params,timeout=15)
-        if not r.text.strip(): return None
         return r.json()
     except Exception:
         return None
