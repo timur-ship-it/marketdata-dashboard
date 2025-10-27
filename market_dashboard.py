@@ -2,6 +2,26 @@ import os, pandas as pd, streamlit as st, plotly.express as px
 from datetime import datetime, timedelta
 from fredapi import Fred
 import yfinance as yf, requests
+import difflib
+
+def fuzzy_match(name, options):
+    import difflib
+    if not isinstance(name, str): return None
+    options = list(options) if hasattr(options, "tolist") else list(options)
+    if not options: return None
+    name = name.strip().lower()
+    matches = difflib.get_close_matches(name, [str(x).lower() for x in options], n=1, cutoff=0.5)
+    if matches:
+        match_index = [str(x).lower() for x in options].index(matches[0])
+        return options[match_index]
+    return None
+    name = name.strip().lower()
+    matches = difflib.get_close_matches(name, [str(x).lower() for x in options], n=1, cutoff=0.5)
+    if matches:
+        match_index = [str(x).lower() for x in options].index(matches[0])
+        return options[match_index]
+    return None
+
 
 st.set_page_config(page_title="MarketData Dashboard", layout="wide")
 st.markdown("<style>div.block-container{padding-top:1rem;padding-bottom:0.5rem;} .stMetric{gap:.25rem}</style>", unsafe_allow_html=True)
@@ -92,88 +112,112 @@ for (name,sym), col in zip(symbols.items(), row):
 
 st.divider()
 
-# ========== Sukuk (Cbonds demo) ==========
-st.header("🕌 Sukuk Bonds (Cbonds demo: login=Test/password=Test)")
-demo_isins=["XS0975256683","XS2595679111","XS1809986734"]
-rows=[]
-for isin in demo_isins:
-    data=cbonds_demo_emission(isin)
-    if data and "emissions" in data and data["emissions"].get("data"):
-        e=data["emissions"]["data"][0]
-        rows.append({"ISIN":isin,"Issuer":e.get("issuer_name_eng",""),
-                     "Coupon":e.get("coupon",""),"Maturity":e.get("maturity_date",""),
-                     "Currency":e.get("currency_code","")})
-if rows:
-    st.dataframe(pd.DataFrame(rows), use_container_width=True)
+# ========== Sukuk (Cbonds API) ==========
+st.header("🕌 Sukuk Bonds (Cbonds Live API)")
+
+cb_user = st.text_input("Cbonds login (email)", "timur@konex.ae")
+cb_pass = st.text_input("Cbonds password", type="password")
+
+if cb_user and cb_pass:
+    isins = ["XS0975256683","XS2595679111","XS1809986734","XS2396609819","XS2506541443","XS2069132036"]
+    rows = []
+    for isin in isins:
+        url = "https://ws.cbonds.info/services/json/get_emissions/"
+        params = {"login": cb_user, "password": cb_pass, "ISIN": isin}
+        try:
+            r = requests.get(url, params=params, timeout=20)
+            if r.status_code == 200:
+                js = r.json()
+                data = js.get("emission") or (js.get("items") or [{}])[0]
+                if data:
+                    rows.append({
+                        "ISIN": isin,
+                        "Issuer": data.get("issuer_name_eng", ""),
+                        "Coupon": data.get("coupon", ""),
+                        "Maturity": data.get("maturity_date", ""),
+                        "Currency": data.get("currency_name", "")
+                    })
+            else:
+                st.warning(f"{isin}: HTTP {r.status_code}")
+        except Exception as e:
+            st.error(f"{isin}: {e}")
+
+    if rows:
+        st.dataframe(pd.DataFrame(rows), use_container_width=True)
+    else:
+        st.info("No Sukuk data retrieved — check credentials or ISIN list.")
 else:
-    st.info("Demo endpoint often returns empty payloads. As soon as you have real credentials, data will appear here automatically.")
+    st.warning("Enter your Cbonds credentials above to load live Sukuk data.")
 
 st.divider()
 
-# ========== Real Estate Portfolio ==========
-
-# ========== Real Estate Portfolio ==========
+# ---------- Real Estate Portfolio ----------
 st.header("🏘️ Property Portfolio vs Market")
 
 pulse_file = newest_parquet(PULSE_DIR)
 if pulse_file and os.path.exists(pulse_file):
-    try:
-        pulse = pd.read_parquet(pulse_file)
-        location_col = next(
-            (c for c in ["area_name_en", "community_name_en", "project_name_en"]
-             if c in pulse.columns and pulse[c].notna().any()),
-            None
-        )
-        price_col = "actual_worth"
-        size_col = "procedure_area"
+    pulse = pd.read_parquet(pulse_file)
+    area_col = "area_name_en" if "area_name_en" in pulse.columns else None
+    price_col = "meter_sale_price"
 
-        if not location_col or price_col not in pulse.columns or size_col not in pulse.columns:
-            st.error("Dubai Pulse file missing required columns.")
-        else:
-            pulse = pulse.dropna(subset=[location_col, price_col, size_col])
-            pulse = pulse[pulse[location_col].astype(str).str.strip() != ""]
-            pulse["price_psf"] = pulse[price_col] / pulse[size_col]
-            area_mean = pulse.groupby(location_col)["price_psf"].mean().dropna().sort_values()
+    pulse = pulse.dropna(subset=[area_col, price_col])
+    pulse = pulse[pulse[area_col].astype(str).str.strip() != ""]
 
-            if os.path.exists(PORTFOLIO_FILE):
-                portfolio = pd.read_csv(PORTFOLIO_FILE)
-            else:
-                portfolio = pd.DataFrame(columns=["Location", "Price", "Area"])
+    pulse["price_psm"] = pulse[price_col]
+    pulse["price_psf"] = pulse[price_col] / 10.7639
+    area_mean_m2 = pulse.groupby(area_col)["price_psm"].mean().dropna()
+    area_mean_ft2 = pulse.groupby(area_col)["price_psf"].mean().dropna()
 
-            with st.form("add_property"):
-                st.subheader("Add New Property")
-                c1, c2, c3 = st.columns(3)
-                with c1:
-                    locations = sorted(area_mean.index.tolist())
-                    if not locations:
-                        st.warning("No valid locations found in dataset.")
-                        location = None
-                    else:
-                        location = st.selectbox("Location", locations)
-                with c2:
-                    price = st.number_input("Purchase Price (AED)", min_value=0.0, step=10000.0)
-                with c3:
-                    area = st.number_input("Unit Area (sqft)", min_value=0.0, step=10.0)
+    portfolio = (
+        pd.read_csv(PORTFOLIO_FILE)
+        if os.path.exists(PORTFOLIO_FILE)
+        else pd.DataFrame(columns=["Location", "Price", "Area_ft2"])
+    )
 
-                if st.form_submit_button("Add / Update") and location and price > 0 and area > 0:
-                    new = pd.DataFrame({"Location": [location], "Price": [price], "Area": [area]})
-                    portfolio = pd.concat([portfolio, new], ignore_index=True)
-                    os.makedirs(os.path.dirname(PORTFOLIO_FILE), exist_ok=True)
-                    portfolio.to_csv(PORTFOLIO_FILE, index=False)
-                    st.success("Property added successfully.")
+    with st.form("add_property"):
+        st.subheader("Add New Property")
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            location = st.selectbox("Location", sorted(area_mean_m2.index))
+        with c2:
+            price = st.number_input("Purchase Price (AED)", min_value=0.0, step=10000.0)
+        with c3:
+            area_ft2 = st.number_input("Unit Area (ft²)", min_value=0.0, step=10.0)
+        if st.form_submit_button("Add / Update") and location and price > 0 and area_ft2 > 0:
+            portfolio = pd.concat(
+                [portfolio, pd.DataFrame({"Location":[location],"Price":[price],"Area_ft2":[area_ft2]})],
+                ignore_index=True,
+            )
+            os.makedirs(os.path.dirname(PORTFOLIO_FILE), exist_ok=True)
+            portfolio.to_csv(PORTFOLIO_FILE, index=False)
+            st.success("Property added."); st.experimental_rerun()
 
-            if not portfolio.empty:
-                portfolio["Your_PPSF"] = portfolio["Price"] / portfolio["Area"]
-                portfolio["Market_PPSF"] = portfolio["Location"].map(area_mean)
-                portfolio["Change_%"] = (portfolio["Market_PPSF"] / portfolio["Your_PPSF"] - 1) * 100
-                st.dataframe(portfolio, use_container_width=True)
-                st.metric("Portfolio Avg Growth/Loss", f"{portfolio['Change_%'].mean():+.2f}%")
-            else:
-                st.info("Add a property above to see portfolio performance.")
+    if not portfolio.empty:
+        portfolio["Area_m2"] = portfolio["Area_ft2"] / 10.7639
+        portfolio["Your_PPSM"] = portfolio["Price"] / portfolio["Area_m2"]
+        portfolio["Matched_Location"] = portfolio["Location"].apply(lambda x: fuzzy_match(x, area_mean_m2.index))
+        portfolio["Market_PPSM"] = portfolio["Matched_Location"].map(area_mean_m2)
+        portfolio["Change_%"] = (portfolio["Market_PPSM"] / portfolio["Your_PPSM"] - 1) * 100
+        portfolio["Your_PPSF"] = portfolio["Your_PPSM"] / 10.7639
+        portfolio["Market_PPSF"] = portfolio["Market_PPSM"] / 10.7639
 
-    except Exception as e:
-        st.error(f"Failed to process Dubai Pulse file: {e}")
+        st.subheader("Your Portfolio (compared on AED / m² basis)")
+        for i, row in portfolio.iterrows():
+            c1, c2, c3, c4, c5, c6 = st.columns([2,2,2,2,2,1])
+            c1.text(row["Location"])
+            c2.text(f"AED {row['Price']:,.0f}")
+            c3.text(f"{row['Area_ft2']:,.0f} ft²  ({row['Area_m2']:.1f} m²)")
+            c4.text(f"Your {row['Your_PPSF']:,.0f} / ft²")
+            c5.text(f"{row['Change_%']:+.2f}% vs market")
+            if c6.button("🗑️", key=f"del_{i}"):
+                portfolio = portfolio.drop(i).reset_index(drop=True)
+                portfolio.to_csv(PORTFOLIO_FILE, index=False)
+                st.experimental_rerun()
 
+        avg = portfolio["Change_%"].mean()
+        st.metric("Portfolio Avg Δ (AED / m²)", f"{avg:+.2f}%")
+    else:
+        st.info("Add a property above to see portfolio performance.")
 else:
     st.warning("No Dubai Pulse file found in processed folder.")
 

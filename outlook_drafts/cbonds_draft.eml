@@ -1,0 +1,47 @@
+To: pro@cbonds.com
+From: timur@konex.ae
+Subject: Inquiry =?utf-8?b?4oCUIEJvbmQvU3Vrxatr?= Data API Coverage for
+ Specific ISINs
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+MIME-Version: 1.0
+
+Dear Cbonds Team,
+
+My name is Timur Vagizov, and I represent EASTGATE ADVISORY SERVICES - FZCO, =
+Dubai UAE. I am interested in integrating a bond/suk=C5=ABk data feed into ou=
+r Python-based analytics and dashboard system.
+
+Below are my requirements:
+- Instruments (ISINs):
+  XS3065329446, XS2633136234, XS2914525154, XS2841181972, XS3068594129, XS277=
+7443768
+- Fields required: price quotes, yield to maturity, outstanding amount (if av=
+ailable), issue date, maturity date
+- Frequency: At least end-of-day data, preferably updated daily
+- Historical depth: As far back as the series covers (ideally from issuance)
+- Delivery format: REST API (JSON/CSV) preferable, or another format you supp=
+ort
+- Usage: The data will be used internally for analysis and dashboarding by ou=
+r team
+
+Could you please provide the following information:
+1. Confirmation of coverage: Are the ISINs above included in your database? I=
+f yes, which fields are available for each?
+2. Frequency and latency of updates: How soon after market close / issuer pub=
+lication do prices/yields become available?
+3. Pricing tiers: What is the cost structure (monthly, annual, per-instrument=
+, minimal tier) for usage at our scale (=E2=89=886 instruments)?
+4. Delivery details: Which endpoints/formats are supported, limits on request=
+s, any integration support or sample data you provide?
+
+I would appreciate any sample data or sandbox access to evaluate compatibilit=
+y before committing.
+
+Thank you very much for your assistance. I look forward to your reply.
+
+Best regards,
+Timur Vagizov
+EASTGATE ADVISORY SERVICES - FZCO, Dubai UAE
+Phone: +971589802649
+Email: timur@konex.ae
