@@ -112,42 +112,40 @@ for (name,sym), col in zip(symbols.items(), row):
 
 st.divider()
 
-# ========== Sukuk (Cbonds API) ==========
+# ========== Sukuk (Cbonds API with secrets) ==========
 st.header("🕌 Sukuk Bonds (Cbonds Live API)")
 
-cb_user = st.text_input("Cbonds login (email)", "timur@konex.ae")
-cb_pass = st.text_input("Cbonds password", type="password")
+cb_user = st.secrets["cbonds"]["login"]
+cb_pass = st.secrets["cbonds"]["password"]
 
-if cb_user and cb_pass:
-    isins = ["XS0975256683","XS2595679111","XS1809986734","XS2396609819","XS2506541443","XS2069132036"]
-    rows = []
-    for isin in isins:
-        url = "https://ws.cbonds.info/services/json/get_emissions/"
-        params = {"login": cb_user, "password": cb_pass, "ISIN": isin}
-        try:
-            r = requests.get(url, params=params, timeout=20)
-            if r.status_code == 200:
-                js = r.json()
-                data = js.get("emission") or (js.get("items") or [{}])[0]
-                if data:
-                    rows.append({
-                        "ISIN": isin,
-                        "Issuer": data.get("issuer_name_eng", ""),
-                        "Coupon": data.get("coupon", ""),
-                        "Maturity": data.get("maturity_date", ""),
-                        "Currency": data.get("currency_name", "")
-                    })
-            else:
-                st.warning(f"{isin}: HTTP {r.status_code}")
-        except Exception as e:
-            st.error(f"{isin}: {e}")
+isins = ["XS0975256683","XS2595679111","XS1809986734","XS2396609819","XS2506541443","XS2069132036"]
+rows = []
+for isin in isins:
+    url = "https://ws.cbonds.info/services/json/get_emissions/"
+    params = {"login": cb_user, "password": cb_pass, "ISIN": isin}
+    try:
+        r = requests.get(url, params=params, timeout=20)
+        if r.status_code == 200:
+            js = r.json()
+            items = js.get("items") or []
+            match = next((e for e in items if e.get("isin") == isin), None)
+            if match:
+                rows.append({
+                    "ISIN": isin,
+                    "Issuer": match.get("issuer_name_eng", ""),
+                    "Coupon": match.get("coupon", ""),
+                    "Maturity": match.get("maturity_date", ""),
+                    "Currency": match.get("currency_name", "")
+                })
+        else:
+            st.warning(f"{isin}: HTTP {r.status_code}")
+    except Exception as e:
+        st.error(f"{isin}: {e}")
 
-    if rows:
-        st.dataframe(pd.DataFrame(rows), use_container_width=True)
-    else:
-        st.info("No Sukuk data retrieved — check credentials or ISIN list.")
+if rows:
+    st.dataframe(pd.DataFrame(rows), use_container_width=True)
 else:
-    st.warning("Enter your Cbonds credentials above to load live Sukuk data.")
+    st.info("No Sukuk data retrieved — check credentials or ISIN list.")
 
 st.divider()
 
