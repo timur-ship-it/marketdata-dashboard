@@ -54,19 +54,6 @@ def get_equity(symbol):
         df.rename(columns={close_col:"Close"}, inplace=True)
     return df[["Date","Close"]].dropna()
 
-    except Exception:
-        return None
-
-def newest_parquet(folder):
-    if not os.path.isdir(folder): return None
-    files=[os.path.join(folder,f) for f in os.listdir(folder) if f.endswith(".parquet")]
-    if not files: return None
-    return max(files, key=os.path.getmtime)
-
-# ========== UST ==========
-try:
-    d10 = get_fred_series("DGS10"); d1m = get_fred_series("DGS1MO")
-    merged = pd.merge(d10, d1m, on="Date", suffixes=("_10Y","_1M"))
     merged["Spread"] = merged["Value_10Y"] - merged["Value_1M"]
     c1,c2,c3 = st.columns([1,1,3])
     with c1: st.metric("UST 10-Year", f"{d10.iloc[-1]['Value']:.2f}%", f"{d10.iloc[-1]['Value']-d10.iloc[-2]['Value']:+.02f}")
