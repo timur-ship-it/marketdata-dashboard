@@ -54,7 +54,6 @@ def get_equity(symbol):
         df.rename(columns={close_col:"Close"}, inplace=True)
     return df[["Date","Close"]].dropna()
 
-        return r.json()
     except Exception:
         return None
 
