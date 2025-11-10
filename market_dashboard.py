@@ -100,7 +100,7 @@ cb_pass = st.secrets["cbonds"]["password"]
 isins = ["XS0975256683","XS2595679111","XS1809986734","XS2396609819","XS2506541443","XS2069132036"]
 rows = []
 for isin in isins:
-    url = "https://ws.cbonds.info/services/json/get_emissions/"
+    url = "https://ws.cbonds.info/services/json/?method=get_emissions/"
     params = {"login": cb_user, "password": cb_pass, "ISIN": isin}
     try:
         r = requests.get(url, params=params, timeout=20)
