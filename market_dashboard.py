@@ -53,6 +53,7 @@ def get_equity(symbol):
         if not close_col: return pd.DataFrame()
         df.rename(columns={close_col:"Close"}, inplace=True)
     return df[["Date","Close"]].dropna()
+try:
 
     merged["Spread"] = merged["Value_10Y"] - merged["Value_1M"]
     c1,c2,c3 = st.columns([1,1,3])
